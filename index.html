@@ -24,12 +24,12 @@
 :root[data-theme="dark"]{ --felt:#1a4b42; --felt-hi:#215a4f; --rail:#0c2621; --panel:#22332f; --panel-ink:#eef0e8; --panel-muted:#a6b7b1; }
 *,*::before,*::after{box-sizing:inherit}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;height:100%;background:var(--rail);color:var(--ink);overflow:hidden;
+body{margin:0;min-height:100%;background:var(--rail);color:var(--ink);overflow-x:hidden;overflow-y:auto;
   font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
   -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
 button{font:inherit;color:inherit}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
-.app{height:100%;max-width:600px;margin:0 auto;display:flex;flex-direction:column;align-items:center}
+.app{min-height:100%;max-width:600px;margin:0 auto;display:flex;flex-direction:column;align-items:center}
 header{width:100%;display:flex;align-items:center;gap:12px;padding:8px 14px}
 header h1{margin:0;font-family:"Kaisei Tokumin",serif;font-size:20px;font-weight:800;flex:1}
 .link{background:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer;color:var(--ink)}
@@ -79,7 +79,7 @@ header h1{margin:0;font-family:"Kaisei Tokumin",serif;font-size:20px;font-weight
 /* ---------- my area ---------- */
 .me{width:100%;flex:1 1 auto;display:flex;flex-direction:column;align-items:center;padding:14px 8px 8px;min-height:0}
 .hand{display:flex;justify-content:center;align-items:flex-end;gap:3px;min-height:84px}
-.hand .tile{--w:min(calc((100vw - 34px)/(var(--hn,5) + .5) - 3px),68px);min-width:38px;cursor:pointer;transition:translate .12s ease}
+.hand .tile{--w:min(calc((min(100vw,600px) - 32px - 3px*var(--hn,5))/var(--hn,5)),68px);cursor:pointer;transition:translate .12s ease}
 .hand .tile.drawn{margin-left:12px}
 .hand .tile.sel{translate:0 -12px}
 .hand .tile.best{outline:3px solid var(--gold);outline-offset:1px}
@@ -179,7 +179,7 @@ header h1{margin:0;font-family:"Kaisei Tokumin",serif;font-size:20px;font-weight
     <div class="opts">
       <label>テンパイ <select id="tenSel"><option value="0">教えない</option><option value="1">テンパイだけ</option><option value="2">待ち牌まで</option></select></label>
       <label><input type="checkbox" id="recToggle"> おすすめ打牌</label>
-      <label><input type="checkbox" id="tapToggle"> 2回タップで切る</label>
+      <label><input type="checkbox" id="tapToggle"> 1回目のタップで待ちを表示（2回目で切る）</label>
       <label><input type="checkbox" id="soundToggle"> 打牌音</label>
       <label><input type="checkbox" id="autocutToggle"> オート自摸切り</label>
       <label><input type="checkbox" id="autowinToggle"> オートアガリ</label>
@@ -197,13 +197,13 @@ const $=id=>document.getElementById(id);
 const ty=id=>id>>2;
 
 const S={hands:[[],[],[],[]],rivers:[[],[],[],[]],wall:[],scores:[300,300,300,300],round:0,total:4,
-  n:4,dealer:0,turn:0,phase:'idle',sel:-1,tenLv:2,rec:false,twoTap:false,sound:true,autocut:false,autowin:false,ron:null,gen:0,last:null,ronned:null,reveal:-1,fresh:null};
+  n:4,dealer:0,turn:0,phase:'idle',sel:-1,tenLv:2,rec:false,twoTap:true,sound:true,autocut:false,autowin:false,ron:null,gen:0,last:null,ronned:null,reveal:-1,fresh:null};
 try{const nn=localStorage.getItem('yonmai-n');if(nn!==null&&[4,7,10].includes(+nn))S.n=+nn;else if(nn==='13')S.n=10;const v=localStorage.getItem('yonmai-ten');if(v!==null)S.tenLv=+v;const r=localStorage.getItem('yonmai-rec');if(r!==null)S.rec=r==='1';
-    const w=localStorage.getItem('yonmai-2tap');if(w!==null)S.twoTap=w==='1';const sd=localStorage.getItem('yonmai-sound');if(sd!==null)S.sound=sd==='1';const ac=localStorage.getItem('yonmai-autocut');if(ac!==null)S.autocut=ac==='1';const aw=localStorage.getItem('yonmai-autowin');if(aw!==null)S.autowin=aw==='1';}catch(e){}
+    const w=localStorage.getItem('yonmai-2tap2');if(w!==null)S.twoTap=w==='1';const sd=localStorage.getItem('yonmai-sound');if(sd!==null)S.sound=sd==='1';const ac=localStorage.getItem('yonmai-autocut');if(ac!==null)S.autocut=ac==='1';const aw=localStorage.getItem('yonmai-autowin');if(aw!==null)S.autowin=aw==='1';}catch(e){}
 
 /* ---------- size ---------- */
 function fit(){
-  const avail=innerHeight-44-250;
+  const avail=innerHeight-44-215;  // 手牌・メッセージ・ボタンまでが画面内に収まるよう確保（設定欄は下にスクロール）
   const u=Math.max(0.62,Math.min(innerWidth-8,560,avail)/400);
   document.documentElement.style.setProperty('--u',u+'px');
 }
@@ -485,7 +485,7 @@ $('autowinToggle').onchange=e=>{S.autowin=e.target.checked;try{localStorage.setI
 $('soundToggle').checked=S.sound;
 $('soundToggle').onchange=e=>{S.sound=e.target.checked;try{localStorage.setItem('yonmai-sound',S.sound?'1':'0');}catch(err){}if(S.sound){audio();clack(0);}};
 $('tapToggle').checked=S.twoTap;
-$('tapToggle').onchange=e=>{S.twoTap=e.target.checked;S.sel=-1;try{localStorage.setItem('yonmai-2tap',S.twoTap?'1':'0');}catch(err){}render(false);};
+$('tapToggle').onchange=e=>{S.twoTap=e.target.checked;S.sel=-1;try{localStorage.setItem('yonmai-2tap2',S.twoTap?'1':'0');}catch(err){}render(false);};
 $('rulesBtn').onclick=()=>showRules(S.phase==='idle');
 
 /* ---------- render ---------- */
@@ -561,6 +561,22 @@ function render(anim=true){
   if(an&&S.rec){const c=an.cands[0];
     const tanki=c.sh===0&&waits(c.r).length===1;
     wh=`おすすめ ${tileHTML(h[c.i])} 切り　${c.sh===0?'待ち':'有効牌'} ${c.uke}枚`+(tanki?'（単騎待ち・残りが一番多い牌を選んでいます）':'')+(S.tenLv===2&&c.sh>0?`（${c.sh}シャンテン）`:'');}
+  if(mine&&S.sel>=0&&S.tenLv>0&&h[S.sel]!==undefined){
+    // 1回目のタップ：その牌を切ったときの待ち・枚数を表示
+    const rest=h.filter((_,j)=>j!==S.sel).map(ty);
+    const out=ty(h[S.sel]);const vis=[...rest,out];
+    const w=waits(rest);const shn=shanten(rest);
+    const head=`${tileHTML(h[S.sel])} を切ると`;
+    if(w.length){
+      if(S.tenLv===1) wh=`${head}　<strong>テンパイ</strong>`;
+      else{
+        const tot=w.reduce((s,x)=>s+unseen(x,vis),0);
+        wh=`${head}　<strong>${w.length===1?'単騎待ち':'テンパイ'}</strong>　待ち`+w.map(x=>{const n=unseen(x,vis);return `<span class="w ${n?'':'zero'}">${tileHTML(x*4)}残り${n}枚</span>`;}).join('')+`　<strong>合計${tot}枚待ち</strong>`;
+      }
+    } else if(S.tenLv===2){
+      wh=`${head}　${shn}シャンテン　有効牌 ${ukeire(rest,shn,vis,riverCounts())}枚`;
+    } else wh=`${head}　テンパイにはなりません`;
+  }
   $('waits').innerHTML=wh;
   let a='';
   if(mine&&isWin(h.map(ty))) a='<button class="btn" data-a="tsumo">ツモ</button>';
